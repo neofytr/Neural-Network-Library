@@ -4,6 +4,10 @@
 #define GRAD_DESC 100
 #define DIFF 200
 
+#ifndef DECAY_RATE
+#define DECAY_RATE 1e-1
+#endif
+
 #ifndef MODEL
 #define MODEL GRAD_DESC
 #endif // MODEL
@@ -93,8 +97,9 @@ void nn_delloc(NN *nn);
 void randomize_parameters_NN(NN *nn, int high, int low);
 void forward(NN *nn);
 ELEMENT_TYPE cost_NN(NN *nn, Mat *training_input, Mat *training_output);
-void gradient_descent(NN *nn, Mat *training_input, Mat *training_output, ELEMENT_TYPE learning_rate);
+void gradient_descent(NN *nn, ELEMENT_TYPE learning_rate, size_t epoch);
 void diff(NN *nn, Mat *training_input, Mat *training_output, ELEMENT_TYPE eps, ELEMENT_TYPE learning_rate, Mat *temp_para, ELEMENT_TYPE cost);
+void delta(NN *nn, Mat *training_input, Mat *training_output, ELEMENT_TYPE learning_rate);
 void learn(NN *nn, ELEMENT_TYPE eps, ELEMENT_TYPE learning_rate, size_t learning_iterations, Mat *training_input, Mat *training_output);
 
 #endif // NN_H_
@@ -358,8 +363,8 @@ void randomize_parameters_NN(NN *nn, int high, int low)
 
     for (size_t i = 1; i < arch_count; i++)
     {
-        mat_rand(nn->ws[i], high, low); // Initialize with small random values
-        mat_rand(nn->bs[i], high, low); // Initialize with small random values
+        mat_rand(nn->ws[i], high, low); 
+        mat_rand(nn->bs[i], high, low); 
     }
 }
 
@@ -405,7 +410,7 @@ ELEMENT_TYPE cost_NN(NN *nn, Mat *training_input, Mat *training_output)
     return (result / rows);
 }
 
-void delta(NN *nn, Mat *training_input, Mat *training_output)
+/* void delta(NN *nn, Mat *training_input, Mat *training_output)
 {
     size_t arch_count = nn->arch_count;
     size_t neurons_in_last_layer = NEURONS_IN_LAYER(nn, arch_count - 1);
@@ -465,9 +470,9 @@ void delta(NN *nn, Mat *training_input, Mat *training_output)
     }
 }
 
-void gradient_descent(NN *nn, Mat *training_input, Mat *training_output, ELEMENT_TYPE learning_rate)
+void gradient_descent(NN *nn, ELEMENT_TYPE _learning_rate, size_t epoch)
 {
-    delta(nn, training_input, training_output);
+    ELEMENT_TYPE learning_rate = _learning_rate / (1 + epoch * DECAY_RATE);
     size_t arch_count = nn->arch_count;
     for (size_t layer = 1; layer < arch_count; layer++)
     {
@@ -484,7 +489,7 @@ void gradient_descent(NN *nn, Mat *training_input, Mat *training_output, ELEMENT
         }
     }
 }
-
+ */
 /* ELEMENT_TYPE delta(NN *nn, size_t layer_no, size_t neuron_no, Mat *training_input, Mat *training_output)
 {
     size_t arch_count = nn->arch_count;
@@ -573,7 +578,7 @@ void diff(NN *nn, Mat *training_input, Mat *training_output, ELEMENT_TYPE eps, E
     }
 }
 
-void learn(NN *nn, ELEMENT_TYPE eps, ELEMENT_TYPE learning_rate, size_t learning_iterations, Mat *training_input, Mat *training_output)
+/* void learn(NN *nn, ELEMENT_TYPE eps, ELEMENT_TYPE learning_rate, size_t learning_iterations, Mat *training_input, Mat *training_output)
 {
     for (size_t i = 0; i < learning_iterations; i++)
     {
@@ -587,10 +592,89 @@ void learn(NN *nn, ELEMENT_TYPE eps, ELEMENT_TYPE learning_rate, size_t learning
             diff(nn, training_input, training_output, eps, learning_rate, nn->bs[j], c);
         }
 #elif MODEL == GRAD_DESC
-        gradient_descent(nn, training_input, training_output, learning_rate);
+        delta(nn, training_input, training_output);
+        gradient_descent(nn,learning_rate, i);
 #endif // MODEL
         ELEMENT_TYPE k = cost_NN(nn, training_input, training_output);
         printf("cost: %f\n", k); // Print cost
+    }
+}
+ */
+
+void delta(NN *nn, Mat *training_input, Mat *training_output, ELEMENT_TYPE learning_rate)
+{
+    size_t arch_count = nn->arch_count;
+    size_t neurons_in_last_layer = NEURONS_IN_LAYER(nn, arch_count - 1);
+    size_t neurons_in_first_layer = NEURONS_IN_LAYER(nn, 0);
+    NN_ASSERT(neurons_in_first_layer == training_input->cols);
+
+    for (size_t j = 0; j < training_input->rows; j++)
+    {
+        Mat x = mat_row(training_input, j);
+        *(NN_INPUT(nn)) = x;
+        forward_NN(nn);
+
+        for (size_t k = 0; k < neurons_in_last_layer; k++)
+        {
+            ELEMENT_TYPE a = MAT_AT(NN_OUTPUT(nn), 0, k);
+            ELEMENT_TYPE error = a - MAT_AT(training_output, j, k);
+            MAT_AT(DS_OF_LAYER(nn, arch_count - 1), 0, k) = (2 * error * a * (1 - a)) / neurons_in_last_layer;
+        }
+
+        for (size_t layer = arch_count - 2; layer > 0; layer--)
+        {
+            for (size_t neuron = 0; neuron < nn->arch[layer]; neuron++)
+            {
+                ELEMENT_TYPE delta = (ELEMENT_TYPE)0;
+                for (size_t next_neuron = 0; next_neuron < nn->arch[layer + 1]; next_neuron++)
+                {
+                    delta += MAT_AT(DS_OF_LAYER(nn, layer + 1), 0, next_neuron) * MAT_AT(nn->ws[layer + 1], neuron, next_neuron);
+                }
+                ELEMENT_TYPE a = MAT_AT(nn->as[layer], 0, neuron);
+                MAT_AT(DS_OF_LAYER(nn, layer), 0, neuron) = delta * a * (1 - a);
+            }
+        }
+
+        gradient_descent(nn, learning_rate, j);
+    }
+}
+
+void gradient_descent(NN *nn, ELEMENT_TYPE learning_rate, size_t epoch)
+{
+    size_t arch_count = nn->arch_count;
+    for (size_t layer = 1; layer < arch_count; layer++)
+    {
+        for (size_t neuron = 0; neuron < nn->arch[layer]; neuron++)
+        {
+            for (size_t weight = 0; weight < nn->arch[layer - 1]; weight++)
+            {
+                ELEMENT_TYPE a = MAT_AT(nn->as[layer - 1], 0, weight);
+                ELEMENT_TYPE delta = MAT_AT(DS_OF_LAYER(nn, layer), 0, neuron);
+                MAT_AT(nn->ws[layer], weight, neuron) -= learning_rate * delta * a;
+            }
+            MAT_AT(nn->bs[layer], 0, neuron) -= learning_rate * MAT_AT(DS_OF_LAYER(nn, layer), 0, neuron);
+        }
+    }
+}
+
+void learn(NN *nn, ELEMENT_TYPE eps, ELEMENT_TYPE learning_rate, size_t learning_iterations, Mat *training_input, Mat *training_output)
+{
+
+    for (size_t i = 0; i < learning_iterations; i++)
+    {
+#if MODEL == DIFF
+        size_t arch_count = nn->arch_count;
+        ELEMENT_TYPE c = cost_NN(nn, training_input, training_output);
+        for (size_t j = 1; j < arch_count; j++)
+        {
+            diff(nn, training_input, training_output, eps, learning_rate, nn->ws[j], c);
+            diff(nn, training_input, training_output, eps, learning_rate, nn->bs[j], c);
+        }
+#elif MODEL == GRAD_DESC
+        delta(nn, training_input, training_output, learning_rate);
+#endif // MODEL
+        ELEMENT_TYPE cost = cost_NN(nn, training_input, training_output);
+        //printf("Iteration %zu, Cost: %f\n", i, cost);
     }
 }
 

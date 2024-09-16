@@ -187,7 +187,8 @@ int main()
  */
 
 #define NN_IMPLEMENTATION_
-#define ELEMENT_TYPE double
+#define MODEL GRAD_DESC
+#define ELEMENT_TYPE float
 #define ARRAY_LEN(xs) (sizeof(xs) / sizeof(xs[0]))
 #define SIZE_OF_TRAINING_DATA 4
 #include <string.h>
@@ -196,13 +197,14 @@ int main()
 #include <assert.h>
 #include "nn.h"
 
+
 ELEMENT_TYPE td[] = {
     0, 0, 0,
     1, 0, 1,
     0, 1, 1,
-    1, 1, 0,
-    /* // A1, A0, B1, B0, S1, S0
-    0, 0, 0, 0, 0, 0, 0, // 00 + 00 = 00
+    1, 1, 0, 
+    // A1, A0, B1, B0, S1, S0
+    /* 0, 0, 0, 0, 0, 0, 0, // 00 + 00 = 00
     0, 0, 0, 1, 0, 0, 1, // 00 + 01 = 01
     0, 0, 1, 0, 0, 1, 0, // 00 + 10 = 10
     0, 0, 1, 1, 0, 1, 1, // 00 + 11 = 11
@@ -222,7 +224,8 @@ ELEMENT_TYPE td[] = {
 
 int main()
 {
-    size_t arch[] = {2, 2, 1};                                       // Architecture of the network
+    //omp_set_num_threads(4);
+    size_t arch[] = {2, 5, 1};                                       // Architecture of the network
     Mat *t1 = &(Mat){.rows = 4, .cols = 2, .stride = 3, .es = td};     // Input data
     Mat *t2 = &(Mat){.rows = 4, .cols = 1, .stride = 3, .es = &td[2]}; // Output data
 
@@ -231,24 +234,30 @@ int main()
 
     NN_PRINT(nn);
 
-    learn(nn, 1e-1, 1e-6, 10000000, t1, t2); // Use smaller eps and learning rate
+    learn(nn, 1e-1, 1e-1, 1000000, t1, t2); // Use smaller eps and learning rate
 
     NN_PRINT(nn);
     for (size_t i = 0; i < 2; i++)
     {
         for (size_t j = 0; j < 2; j++)
         {
-            //for (size_t r = 0; r < 2; r++)
-            //{
-                //for (size_t k = 0; k < 2; k++)
-                //{
-                    Mat *mat = &(Mat){.rows = 1, .cols = 2, .es = (ELEMENT_TYPE[]){(ELEMENT_TYPE)i, (ELEMENT_TYPE)(j)}};
+            /* for (size_t r = 0; r < 2; r++)
+            {
+                for (size_t k = 0; k < 2; k++)
+                {
+                    Mat *mat = &(Mat){.rows = 1, .cols = 4, .es = (ELEMENT_TYPE[]){(ELEMENT_TYPE)i, (ELEMENT_TYPE)(j), r, k}};
                     NN_INPUT(nn) = mat;
                     forward_NN(nn);
 
-                    printf("%zu XOR %zu is %f\n", i, j, NN_OUTPUT(nn)->es[0]); 
-                //}
-            //}
+                    printf("%zu %zu + %zu %zu is %f %f %f\n", i, j, r, k, NN_OUTPUT(nn)->es[0], NN_OUTPUT(nn)->es[1], NN_OUTPUT(nn)->es[2]); 
+                }
+            } */
+
+           Mat *mat = &(Mat){.rows = 1, .cols = 2, .es = (ELEMENT_TYPE[]) {i, j}};
+           NN_INPUT(nn) = mat;
+           forward_NN(nn);
+
+           printf("%zu XOR %zu is %f\n", i, j, NN_OUTPUT(nn)->es[0]);
         }
     }
 
