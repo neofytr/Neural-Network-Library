@@ -197,133 +197,58 @@ int main()
 #include "nn.h"
 
 ELEMENT_TYPE td[] = {
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    1,
-    0,
-    0,
-    0,
-    1,
-    1,
-    0,
-    0,
-    0,
-    1,
-    0,
-    1,
-    1,
-    0,
-    0,
-    1,
-    1,
-    0,
-    0,
-    0,
-    1,
-    0,
-    1,
-    0,
-    1,
-    0,
-    1,
-    1,
-    0,
-    1,
-    0,
-    0,
-    1,
-    1,
-    1,
-    1,
-    1,
-    0,
-    1,
-    0,
-    0,
-    0,
-    0,
-    1,
-    0,
-    1,
-    0,
-    0,
-    1,
-    1,
-    0,
-    1,
-    1,
-    1,
-    0,
-    1,
-    0,
-    0,
-    0,
-    1,
-    1,
-    1,
-    0,
-    0,
-    1,
-    0,
-    0,
-    1,
-    1,
-    1,
-    1,
-    0,
-    1,
-    1,
-    1,
-    0,
-    0,
-    1,
-    0,
-    1,
-    1,
-    0,
-    1,
-    1,
-    1,
-    1,
-    1,
-    0,
-    0,
+    0, 0, 0,
+    1, 0, 1,
+    0, 1, 1,
+    1, 1, 0,
+    /* // A1, A0, B1, B0, S1, S0
+    0, 0, 0, 0, 0, 0, 0, // 00 + 00 = 00
+    0, 0, 0, 1, 0, 0, 1, // 00 + 01 = 01
+    0, 0, 1, 0, 0, 1, 0, // 00 + 10 = 10
+    0, 0, 1, 1, 0, 1, 1, // 00 + 11 = 11
+    0, 1, 0, 0, 0, 0, 1, // 01 + 00 = 01
+    0, 1, 0, 1, 0, 1, 0, // 01 + 01 = 10
+    0, 1, 1, 0, 0, 1, 1, // 01 + 10 = 11
+    0, 1, 1, 1, 1, 0, 0, // 01 + 11 = 00 (no carry considered, just the lower 2 bits)
+    1, 0, 0, 0, 0, 1, 0, // 10 + 00 = 10
+    1, 0, 0, 1, 0, 1, 1, // 10 + 01 = 11
+    1, 0, 1, 0, 1, 0, 0, // 10 + 10 = 00 (no carry considered)
+    1, 0, 1, 1, 0, 0, 1, // 10 + 11 = 01
+    1, 1, 0, 0, 0, 1, 1, // 11 + 00 = 11
+    1, 1, 0, 1, 1, 0, 0, // 11 + 01 = 00 (no carry considered)
+    1, 1, 1, 0, 0, 0, 1, // 11 + 10 = 01
+    1, 1, 1, 1, 1, 1, 0  // 11 + 11 = 10 (no carry considered) */
 };
 
 int main()
 {
-    size_t arch[] = {4, 2, 2, 2, 2, 2};                                       // Architecture of the network
-    Mat *t1 = &(Mat){.rows = 16, .cols = 4, .stride = 6, .es = td};     // Input data
-    Mat *t2 = &(Mat){.rows = 16, .cols = 2, .stride = 6, .es = &td[5]}; // Output data
+    size_t arch[] = {2, 2, 1};                                       // Architecture of the network
+    Mat *t1 = &(Mat){.rows = 4, .cols = 2, .stride = 3, .es = td};     // Input data
+    Mat *t2 = &(Mat){.rows = 4, .cols = 1, .stride = 3, .es = &td[2]}; // Output data
 
     NN *nn = nn_alloc(arch, ARRAY_LEN(arch));
-    randomize_parameters_NN(nn, 1, 0);
+    randomize_parameters_NN(nn, 0, 0);
 
-    // NN_PRINT(nn);
+    NN_PRINT(nn);
 
-    learn(nn, 1e-1, 1e-1, 100000, t1, t2); // Use smaller eps and learning rate
+    learn(nn, 1e-1, 1e-6, 10000000, t1, t2); // Use smaller eps and learning rate
 
     NN_PRINT(nn);
     for (size_t i = 0; i < 2; i++)
     {
         for (size_t j = 0; j < 2; j++)
         {
-            for (size_t r = 0; r < 2; r++)
-            {
-                for (size_t k = 0; k < 2; k++)
-                {
-                    Mat *mat = &(Mat){.rows = 1, .cols = 4, .es = (ELEMENT_TYPE[]){(ELEMENT_TYPE)i, (ELEMENT_TYPE)j, (ELEMENT_TYPE)k, (ELEMENT_TYPE)r}};
+            //for (size_t r = 0; r < 2; r++)
+            //{
+                //for (size_t k = 0; k < 2; k++)
+                //{
+                    Mat *mat = &(Mat){.rows = 1, .cols = 2, .es = (ELEMENT_TYPE[]){(ELEMENT_TYPE)i, (ELEMENT_TYPE)(j)}};
                     NN_INPUT(nn) = mat;
                     forward_NN(nn);
 
-                    printf("%zu %zu + %zu %zu is %f %f\n", i, j, k, r, NN_OUTPUT(nn)->es[0], NN_OUTPUT(nn)->es[1]); // Output XOR result
-                }
-            }
+                    printf("%zu XOR %zu is %f\n", i, j, NN_OUTPUT(nn)->es[0]); 
+                //}
+            //}
         }
     }
 
