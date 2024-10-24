@@ -56,6 +56,7 @@
 #define NUMS(a) (sizeof(a) / sizeof(a[0]))
 #define NEURONS_IN_LAYER(nn, layer_no) ((nn->arch[layer_no]))
 #define DS_OF_LAYER(nn, layer_no) (nn->ds[layer_no])
+#define ARRAY_LEN(xs) (sizeof(xs) / sizeof(xs[0]))
 
 typedef struct
 {
@@ -152,7 +153,7 @@ void mat_rand(Mat *a, ELEMENT_TYPE high, ELEMENT_TYPE low)
         low = MIN_RAND_ELEMENT;
     }
 
-    // #pragma omp parallel
+    // #pragma omp parallel for collapse(2)
     for (size_t i = 0; i < a->rows; i++)
     {
         for (size_t j = 0; j < a->cols; j++)
@@ -218,7 +219,7 @@ void mat_dot(Mat *dst, Mat *a, Mat *b)
     size_t cols = dst->cols;
 
     // #pragma omp parallel for
-    // #pragma omp target teams distribute parallel for
+    //  #pragma omp target teams distribute parallel for
     for (size_t i = 0; i < rows; i++)
     {
         for (size_t j = 0; j < cols; j++)
@@ -361,10 +362,11 @@ void randomize_parameters_NN(NN *nn, int high, int low)
     NN_ASSERT(nn != NULL);
     size_t arch_count = nn->arch_count;
 
+    // #pragma omp parallel for
     for (size_t i = 1; i < arch_count; i++)
     {
-        mat_rand(nn->ws[i], high, low); 
-        mat_rand(nn->bs[i], high, low); 
+        mat_rand(nn->ws[i], high, low);
+        mat_rand(nn->bs[i], high, low);
     }
 }
 
@@ -392,6 +394,7 @@ ELEMENT_TYPE cost_NN(NN *nn, Mat *training_input, Mat *training_output)
     size_t cols = training_output->cols;
 
     ELEMENT_TYPE result = (ELEMENT_TYPE)0;
+    // #pragma omp parallel for reduction(+:result)
     for (size_t i = 0; i < rows; i++)
     {
         Mat x = mat_row(training_input, i);
@@ -614,6 +617,7 @@ void delta(NN *nn, Mat *training_input, Mat *training_output, ELEMENT_TYPE learn
         *(NN_INPUT(nn)) = x;
         forward_NN(nn);
 
+        // #pragma omp parallel for
         for (size_t k = 0; k < neurons_in_last_layer; k++)
         {
             ELEMENT_TYPE a = MAT_AT(NN_OUTPUT(nn), 0, k);
@@ -642,6 +646,7 @@ void delta(NN *nn, Mat *training_input, Mat *training_output, ELEMENT_TYPE learn
 void gradient_descent(NN *nn, ELEMENT_TYPE learning_rate, size_t epoch)
 {
     size_t arch_count = nn->arch_count;
+    // #pragma omp parallel for collapse(1)
     for (size_t layer = 1; layer < arch_count; layer++)
     {
         for (size_t neuron = 0; neuron < nn->arch[layer]; neuron++)
@@ -673,9 +678,9 @@ void learn(NN *nn, ELEMENT_TYPE eps, ELEMENT_TYPE learning_rate, size_t learning
 #elif MODEL == GRAD_DESC
         delta(nn, training_input, training_output, learning_rate);
 #endif // MODEL
-        ELEMENT_TYPE cost = cost_NN(nn, training_input, training_output);
-        //printf("Iteration %zu, Cost: %f\n", i, cost);
     }
+    ELEMENT_TYPE cost = cost_NN(nn, training_input, training_output);
+    printf("Final Cost: %f\n", cost);
 }
 
 #endif // NN_IMPLEMENTATION_
