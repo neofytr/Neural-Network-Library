@@ -1,5 +1,4 @@
-#define NN_IMPLEMENTATION_
-#include "../nn.h"
+#include "../nn_visualizer.h"
 
 ELEMENT_TYPE xor [] = {
     1,
@@ -26,36 +25,27 @@ int main()
     NN *nn = nn_alloc(arch, ARRAY_LEN(arch));
     randomize_parameters_NN(nn, 0, 0); // Initialize weights/biases
 
-    learn(nn,
-          1e-1,
-          1e-1,
-          1000000,
-          training_input,
-          training_output);
-
-    for (size_t a1 = 0; a1 < 2; a1++)
+    Visualizer *vis = init_visualizer();
+    if (!vis)
     {
-        for (size_t a0 = 0; a0 < 2; a0++)
-        {
-
-            // Create input
-            ELEMENT_TYPE input[] = {
-                (ELEMENT_TYPE)a1,
-                (ELEMENT_TYPE)a0,
-            };
-
-            // Set input and forward propagate
-            Mat input_mat = {
-                .rows = 1,
-                .cols = 2,
-                .es = input};
-            *(NN_INPUT(nn)) = input_mat;
-            forward_NN(nn);
-
-            // Print results
-            printf("%zu + %zu = %f\n",
-                   a1, a0,
-                   NN_OUTPUT(nn)->es[0]);
-        }
+        fprintf(stderr, "Failed to initialize visualizer\n");
+        return 1;
     }
+
+    vis->cost_vis = init_cost_visualizer();
+    if (!vis->cost_vis)
+    {
+        fprintf(stderr, "Failed to initialize cost visualizer\n");
+        cleanup_visualizer(vis);
+        return 1;
+    }
+
+    // Train network with visualization
+    learn_with_visualization(nn, 1e-3, 0.1, 100000,
+                             training_input, training_output, vis);
+
+    // Cleanup
+    cleanup_visualizer(vis);
+
+    return 0;
 }

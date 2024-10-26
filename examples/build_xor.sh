@@ -1,0 +1,1 @@
+gcc -o nn_vis xor.c -lSDL2 -lSDL2_gfx -lSDL2_ttf -lm
