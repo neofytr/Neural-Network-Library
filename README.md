@@ -390,7 +390,7 @@ The visualizer is designed to provide a graphical representation of your neural 
 ```c
 Visualizer *vis = init_visualizer();
 learn_with_visualization(nn, eps, learning_rate, iterations, training_input, training_output, vis);
-
+```
 
 ## 📝 License
 
