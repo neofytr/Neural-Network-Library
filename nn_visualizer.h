@@ -2,7 +2,7 @@
 #include <SDL2/SDL2_gfxPrimitives.h>
 
 #define NN_IMPLEMENTATION_
-#include "../nn.h" // Including your existing NN implementation
+#include "./nn.h" // Including your existing NN implementation
 
 #define WINDOW_WIDTH 1200
 #define WINDOW_HEIGHT 800
@@ -159,12 +159,12 @@ void update_cost_graph(CostVisualizer *cv, float cost, long long int iterations)
         SDL_RenderDrawLineF(cv->renderer, x1, y1, x2, y2);
     }
 
-    char stats_text[64];
+   /*  char stats_text[64];
     snprintf(stats_text, sizeof(stats_text), "Iteration: %zu", iterations);
     stringRGBA(cv->renderer, 10, 10, stats_text, 0, 0, 0, 255);
 
     snprintf(stats_text, sizeof(stats_text), "Cost: %.6f", cost);
-    stringRGBA(cv->renderer, 10, 30, stats_text, 0, 0, 0, 255);
+    stringRGBA(cv->renderer, 10, 30, stats_text, 0, 0, 0, 255); */
 
     SDL_RenderPresent(cv->renderer);
 }

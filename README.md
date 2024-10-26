@@ -15,6 +15,7 @@ A lightweight, efficient neural network implementation in C supporting both grad
 - [License](#-license)
 - [Contributing](#-contributing)
 - [References](#-references)
+- [Visualizer](#-Visualier)
 
 ## ✨ Features
 
@@ -370,6 +371,26 @@ int main() {
 3. **Data Type Selection**
    - `float`: Faster, less precise
    - `double`: Slower, more precise
+
+# Visualizer
+
+The visualizer is designed to provide a graphical representation of your neural network during the training process. It allows you to see the architecture of the network, the weights of connections between neurons, and the cost over iterations.
+
+## Features:
+- **Neural Network Visualization**: Displays the structure of the neural network, including neurons and their connections. The color of the connections changes based on the weight, transitioning from green (low weight) to pink (high weight).
+- **Training Cost Graph**: Shows the cost (loss) over iterations in a separate window, helping you to track the training progress visually.
+
+## How to Use:
+1. **Initialization**: Create an instance of the visualizer before starting the training.
+2. **Draw the Network**: After each training iteration, call the function to redraw the network with updated weights and activations.
+3. **Update Cost Graph**: Continuously update the cost graph with the current training cost after each iteration.
+4. **Run the Training Loop**: Use your existing training loop to train the model while updating the visualizer.
+
+## Example Usage:
+```c
+Visualizer *vis = init_visualizer();
+learn_with_visualization(nn, eps, learning_rate, iterations, training_input, training_output, vis);
+
 
 ## 📝 License
 
