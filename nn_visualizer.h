@@ -2,7 +2,7 @@
 #include <SDL2/SDL2_gfxPrimitives.h>
 
 #define NN_IMPLEMENTATION_
-#include "./nn.h" // Including your existing NN implementation
+#include "./nn.h" 
 
 #define WINDOW_WIDTH 1200
 #define WINDOW_HEIGHT 800
@@ -33,13 +33,10 @@ typedef struct
     CostVisualizer *cost_vis;
 } Visualizer;
 
-// Convert weight to color (green to pink)
 void weight_to_color(float weight, Uint8 *r, Uint8 *g, Uint8 *b)
 {
-    // Ensure weight is between 0 and 1
     weight = weight < 0 ? 0 : (weight > 1 ? 1 : weight);
 
-    // Green (0, 255, 0) to Pink (255, 192, 203)
     *r = (Uint8)(255 * weight);
     *g = (Uint8)(255 * (1 - weight) + 192 * weight);
     *b = (Uint8)(203 * weight);
@@ -112,21 +109,17 @@ void update_cost_graph(CostVisualizer *cv, float cost, long long int iterations)
     }
     else
     {
-        // Shift array left and add new cost at end
         memmove(cv->cost_history, cv->cost_history + 1,
                 (MAX_COST_HISTORY - 1) * sizeof(float));
         cv->cost_history[MAX_COST_HISTORY - 1] = cost;
     }
 
-    // Update min/max cost
     cv->min_cost = cost < cv->min_cost ? cost : cv->min_cost;
     cv->max_cost = cost > cv->max_cost ? cost : cv->max_cost;
 
-    // Clear renderer
     SDL_SetRenderDrawColor(cv->renderer, 255, 255, 255, 255);
     SDL_RenderClear(cv->renderer);
 
-    // Draw axes
     SDL_SetRenderDrawColor(cv->renderer, 0, 0, 0, 255);
     SDL_RenderDrawLine(cv->renderer,
                        COST_GRAPH_PADDING, COST_GRAPH_PADDING,
@@ -136,7 +129,6 @@ void update_cost_graph(CostVisualizer *cv, float cost, long long int iterations)
                        COST_WINDOW_WIDTH - COST_GRAPH_PADDING,
                        COST_WINDOW_HEIGHT - COST_GRAPH_PADDING);
 
-    // Draw cost line
     SDL_SetRenderDrawColor(cv->renderer, 255, 0, 0, 255);
     for (int i = 1; i < cv->cost_count; i++)
     {
@@ -174,11 +166,9 @@ void draw_network(Visualizer *vis, NN *nn)
     SDL_SetRenderDrawColor(vis->renderer, 255, 255, 255, 255);
     SDL_RenderClear(vis->renderer);
 
-    // Calculate starting x position to center the network
     int total_width = (nn->arch_count - 1) * LAYER_SPACING;
     int start_x = (WINDOW_WIDTH - total_width) / 2;
 
-    // Draw connections first (so they appear behind neurons)
     for (size_t layer = 1; layer < nn->arch_count; layer++)
     {
         int x1 = start_x + (layer - 1) * LAYER_SPACING;
@@ -192,18 +182,15 @@ void draw_network(Visualizer *vis, NN *nn)
             {
                 int y2 = WINDOW_HEIGHT / 2 + (j - nn->arch[layer] / 2.0) * VERTICAL_SPACING;
 
-                // Get weight and convert to color
                 float weight = MAT_AT(nn->ws[layer], i, j);
                 Uint8 r, g, b;
                 weight_to_color(weight, &r, &g, &b);
 
-                // Draw line with color based on weight
                 lineRGBA(vis->renderer, x1, y1, x2, y2, r, g, b, 255);
             }
         }
     }
 
-    // Draw neurons
     for (size_t layer = 0; layer < nn->arch_count; layer++)
     {
         int x = start_x + layer * LAYER_SPACING;
@@ -212,11 +199,9 @@ void draw_network(Visualizer *vis, NN *nn)
         {
             int y = WINDOW_HEIGHT / 2 + (i - nn->arch[layer] / 2.0) * VERTICAL_SPACING;
 
-            // Draw neuron as filled circle
             filledCircleRGBA(vis->renderer, x, y, NEURON_RADIUS,
                              100, 100, 100, 255);
 
-            // Draw neuron outline
             circleRGBA(vis->renderer, x, y, NEURON_RADIUS,
                        0, 0, 0, 255);
 
@@ -252,14 +237,12 @@ void cleanup_visualizer(Visualizer *vis)
     SDL_Quit();
 }
 
-// Modified learn function that updates visualization
 void learn_with_visualization(NN *nn, ELEMENT_TYPE eps, ELEMENT_TYPE learning_rate,
                               size_t learning_iterations, Mat *training_input,
                               Mat *training_output, Visualizer *vis)
 {
     for (size_t i = 0; i < learning_iterations && vis->running; i++)
     {
-        // Handle SDL events
         SDL_Event event;
         while (SDL_PollEvent(&event))
         {
@@ -285,7 +268,6 @@ void learn_with_visualization(NN *nn, ELEMENT_TYPE eps, ELEMENT_TYPE learning_ra
         ELEMENT_TYPE current_cost = cost_NN(nn, training_input, training_output);
         update_cost_graph(vis->cost_vis, current_cost, i);
 
-        // Update visualization every N iterations (adjust as needed)
         draw_network(vis, nn);
         // SDL_Delay(16); // Cap at ~60 FPS
     }
