@@ -1,4 +1,4 @@
-#include "./nn_visualizer.h"
+#include "../../nn_visualizer.h"
 
 ELEMENT_TYPE xor_data[] = {
     // Input pairs | Expected output
@@ -47,28 +47,30 @@ int main(void)
         nn,
         1e-2,
         1e-2,
-        10000,
+        1000,
         training_input,
         training_output,
         vis);
 
     printf("\nFinal XOR predictions:\n");
-    for (size_t i = 0; i < training_input->rows; i++)
+    for (size_t a1 = 0; a1 < 2; a1++)
     {
-        ELEMENT_TYPE input1 = MAT_AT(training_input, i, 0);
-        ELEMENT_TYPE input2 = MAT_AT(training_input, i, 1);
-
-        /* forward_NN(nn, &(Mat){
-                           .rows = 1,
-                           .cols = 2,
-                           .stride = 2,
-                           .es = (ELEMENT_TYPE[]){input1, input2}}); */
-
-        ELEMENT_TYPE prediction = MAT_AT(nn->as[nn->arch_count - 1], 0, 0);
-        ELEMENT_TYPE expected = MAT_AT(training_output, i, 0);
-
-        printf("Input: %g XOR %g = %g (Expected: %g)\n",
-               input1, input2, prediction, expected);
+        for (size_t a0 = 0; a0 < 2; a0++)
+        {
+            ELEMENT_TYPE input[] = {
+                (ELEMENT_TYPE)a1,
+                (ELEMENT_TYPE)a0,
+            };
+            Mat input_mat = {
+                .rows = 1,
+                .cols = 2,
+                .es = input};
+            *(NN_INPUT(nn)) = input_mat;
+            forward_NN(nn);
+            printf("%zu + %zu = %f\n",
+                   a1, a0,
+                   NN_OUTPUT(nn)->es[0]);
+        }
     }
 
     cleanup_visualizer(vis);
