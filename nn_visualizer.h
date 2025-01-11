@@ -3,7 +3,7 @@
 #include "./nn.h"
 #include <string.h>
 
-#define WINDOW_WIDTH 1600 // Increased to accommodate both visualizations
+#define WINDOW_WIDTH 1600
 #define WINDOW_HEIGHT 800
 #define NEURON_RADIUS 20
 #define LAYER_SPACING 200
@@ -44,7 +44,6 @@ typedef struct
     CostVisualizer *cost_vis;
 } Visualizer;
 
-// Convert weight to color (blue to orange gradient)
 Color weight_to_color(float weight)
 {
     weight = weight < 0 ? 0 : (weight > 1 ? 1 : weight);
@@ -58,12 +57,11 @@ Color weight_to_color(float weight)
 Visualizer *init_visualizer()
 {
     InitWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "Neural Network Visualization");
-    SetTargetFPS(60);
+    SetTargetFPS(120);
 
     Visualizer *vis = malloc(sizeof(Visualizer));
     vis->running = true;
 
-    // Initialize cost visualizer
     vis->cost_vis = malloc(sizeof(CostVisualizer));
     vis->cost_vis->cost_history = malloc(sizeof(float) * MAX_COST_HISTORY);
     vis->cost_vis->cost_count = 0;
@@ -75,11 +73,9 @@ Visualizer *init_visualizer()
 
 void draw_cost_graph(CostVisualizer *cv, float cost, long long int iterations)
 {
-    // Cost graph is now drawn in the right portion of the window
     int graph_x = WINDOW_WIDTH - COST_GRAPH_WIDTH - 20;    // 20px padding from right
     int graph_y = (WINDOW_HEIGHT - COST_GRAPH_HEIGHT) / 2; // Centered vertically
 
-    // Update cost history
     if (cv->cost_count < MAX_COST_HISTORY)
     {
         cv->cost_history[cv->cost_count++] = cost;
@@ -94,10 +90,8 @@ void draw_cost_graph(CostVisualizer *cv, float cost, long long int iterations)
     cv->min_cost = fminf(cost, cv->min_cost);
     cv->max_cost = fmaxf(cost, cv->max_cost);
 
-    // Draw graph background
     DrawRectangle(graph_x, graph_y, COST_GRAPH_WIDTH, COST_GRAPH_HEIGHT, COLOR_BACKGROUND);
 
-    // Draw grid
     for (int i = 0; i < 10; i++)
     {
         float y = graph_y + COST_GRAPH_PADDING +
@@ -108,7 +102,6 @@ void draw_cost_graph(CostVisualizer *cv, float cost, long long int iterations)
             1, COLOR_GRID);
     }
 
-    // Draw axes
     DrawLineEx(
         (Vector2){graph_x + COST_GRAPH_PADDING, graph_y + COST_GRAPH_PADDING},
         (Vector2){graph_x + COST_GRAPH_PADDING, graph_y + COST_GRAPH_HEIGHT - COST_GRAPH_PADDING},
@@ -118,7 +111,6 @@ void draw_cost_graph(CostVisualizer *cv, float cost, long long int iterations)
         (Vector2){graph_x + COST_GRAPH_WIDTH - COST_GRAPH_PADDING, graph_y + COST_GRAPH_HEIGHT - COST_GRAPH_PADDING},
         2, COLOR_TEXT);
 
-    // Draw cost line
     for (int i = 1; i < cv->cost_count; i++)
     {
         float x1 = graph_x + COST_GRAPH_PADDING +
@@ -140,7 +132,6 @@ void draw_cost_graph(CostVisualizer *cv, float cost, long long int iterations)
         DrawLineEx((Vector2){x1, y1}, (Vector2){x2, y2}, 2, COLOR_COST_LINE);
     }
 
-    // Draw stats
     char stats_text[64];
     snprintf(stats_text, sizeof(stats_text), "Iteration: %lld", iterations);
     DrawText(stats_text, graph_x + 10, graph_y + 10, 20, COLOR_TEXT);
@@ -151,12 +142,10 @@ void draw_cost_graph(CostVisualizer *cv, float cost, long long int iterations)
 
 void draw_network(NN *nn)
 {
-    // Network is now drawn in the left portion of the window
     int network_width = WINDOW_WIDTH - COST_GRAPH_WIDTH - 40; // 40px total padding
     int total_width = (nn->arch_count - 1) * LAYER_SPACING;
     int start_x = (network_width - total_width) / 2;
 
-    // Draw connections
     for (size_t layer = 1; layer < nn->arch_count; layer++)
     {
         int x1 = start_x + (layer - 1) * LAYER_SPACING;
@@ -178,7 +167,6 @@ void draw_network(NN *nn)
         }
     }
 
-    // Draw neurons
     for (size_t layer = 0; layer < nn->arch_count; layer++)
     {
         int x = start_x + layer * LAYER_SPACING;

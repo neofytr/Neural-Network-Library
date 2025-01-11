@@ -2,7 +2,7 @@
 
 ELEMENT_TYPE xor_data[] = {
     // Input pairs | Expected output
-    1, 0, 0,
+    1, 0, 1,
     0, 1, 1,
     1, 1, 0,
     0, 0, 0};
@@ -47,7 +47,7 @@ int main(void)
         nn,
         1e-2,
         1e-2,
-        1000,
+        10000,
         training_input,
         training_output,
         vis);
