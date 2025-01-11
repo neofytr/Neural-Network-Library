@@ -1,24 +1,37 @@
-#include <SDL2/SDL.h>
-#include <SDL2/SDL2_gfxPrimitives.h>
-
+#include "raylib/src/raylib.h"
 #define NN_IMPLEMENTATION_
-#include "./nn.h" 
+#include "./nn.h"
+#include <string.h>
 
-#define WINDOW_WIDTH 1200
+#define WINDOW_WIDTH 1600 // Increased to accommodate both visualizations
 #define WINDOW_HEIGHT 800
 #define NEURON_RADIUS 20
 #define LAYER_SPACING 200
 #define VERTICAL_SPACING 80
 
-#define COST_WINDOW_WIDTH 800
-#define COST_WINDOW_HEIGHT 400
+#define COST_GRAPH_WIDTH 600
+#define COST_GRAPH_HEIGHT 400
 #define MAX_COST_HISTORY 1000
 #define COST_GRAPH_PADDING 40
 
+// Modern color scheme
+#define COLOR_BACKGROUND \
+    (Color) { 28, 31, 35, 255 }
+#define COLOR_GRID \
+    (Color) { 40, 44, 52, 255 }
+#define COLOR_TEXT \
+    (Color) { 229, 231, 235, 255 }
+#define COLOR_ACCENT \
+    (Color) { 88, 166, 255, 255 }
+#define COLOR_NEURON \
+    (Color) { 55, 65, 81, 255 }
+#define COLOR_NEURON_BORDER \
+    (Color) { 156, 163, 175, 255 }
+#define COLOR_COST_LINE \
+    (Color) { 249, 115, 22, 255 }
+
 typedef struct
 {
-    SDL_Window *window;
-    SDL_Renderer *renderer;
     float *cost_history;
     int cost_count;
     float min_cost;
@@ -27,82 +40,46 @@ typedef struct
 
 typedef struct
 {
-    SDL_Window *window;
-    SDL_Renderer *renderer;
-    int running;
+    bool running;
     CostVisualizer *cost_vis;
 } Visualizer;
 
-void weight_to_color(float weight, Uint8 *r, Uint8 *g, Uint8 *b)
+// Convert weight to color (blue to orange gradient)
+Color weight_to_color(float weight)
 {
     weight = weight < 0 ? 0 : (weight > 1 ? 1 : weight);
-
-    *r = (Uint8)(255 * weight);
-    *g = (Uint8)(255 * (1 - weight) + 192 * weight);
-    *b = (Uint8)(203 * weight);
+    return (Color){
+        (unsigned char)(249 * weight),
+        (unsigned char)(115 * (1 - weight)),
+        (unsigned char)(22 * (1 - weight)),
+        180};
 }
 
 Visualizer *init_visualizer()
 {
-    if (SDL_Init(SDL_INIT_VIDEO) < 0)
-    {
-        fprintf(stderr, "SDL initialization failed: %s\n", SDL_GetError());
-        return NULL;
-    }
+    InitWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "Neural Network Visualization");
+    SetTargetFPS(60);
 
     Visualizer *vis = malloc(sizeof(Visualizer));
-    vis->window = SDL_CreateWindow("Neural Network Visualizer",
-                                   SDL_WINDOWPOS_UNDEFINED,
-                                   SDL_WINDOWPOS_UNDEFINED,
-                                   WINDOW_WIDTH, WINDOW_HEIGHT,
-                                   SDL_WINDOW_SHOWN);
+    vis->running = true;
 
-    if (!vis->window)
-    {
-        fprintf(stderr, "Window creation failed: %s\n", SDL_GetError());
-        free(vis);
-        return NULL;
-    }
+    // Initialize cost visualizer
+    vis->cost_vis = malloc(sizeof(CostVisualizer));
+    vis->cost_vis->cost_history = malloc(sizeof(float) * MAX_COST_HISTORY);
+    vis->cost_vis->cost_count = 0;
+    vis->cost_vis->min_cost = INFINITY;
+    vis->cost_vis->max_cost = -INFINITY;
 
-    vis->renderer = SDL_CreateRenderer(vis->window, -1,
-                                       SDL_RENDERER_ACCELERATED |
-                                           SDL_RENDERER_PRESENTVSYNC);
-
-    if (!vis->renderer)
-    {
-        fprintf(stderr, "Renderer creation failed: %s\n", SDL_GetError());
-        SDL_DestroyWindow(vis->window);
-        free(vis);
-        return NULL;
-    }
-
-    vis->running = 1;
     return vis;
 }
 
-CostVisualizer *init_cost_visualizer()
+void draw_cost_graph(CostVisualizer *cv, float cost, long long int iterations)
 {
-    CostVisualizer *cv = malloc(sizeof(CostVisualizer));
-    cv->window = SDL_CreateWindow("Training Cost",
-                                  SDL_WINDOWPOS_UNDEFINED,
-                                  SDL_WINDOWPOS_UNDEFINED,
-                                  COST_WINDOW_WIDTH, COST_WINDOW_HEIGHT,
-                                  SDL_WINDOW_SHOWN);
+    // Cost graph is now drawn in the right portion of the window
+    int graph_x = WINDOW_WIDTH - COST_GRAPH_WIDTH - 20;    // 20px padding from right
+    int graph_y = (WINDOW_HEIGHT - COST_GRAPH_HEIGHT) / 2; // Centered vertically
 
-    cv->renderer = SDL_CreateRenderer(cv->window, -1,
-                                      SDL_RENDERER_ACCELERATED |
-                                          SDL_RENDERER_PRESENTVSYNC);
-
-    cv->cost_history = malloc(sizeof(float) * MAX_COST_HISTORY);
-    cv->cost_count = 0;
-    cv->min_cost = INFINITY;
-    cv->max_cost = -INFINITY;
-
-    return cv;
-}
-
-void update_cost_graph(CostVisualizer *cv, float cost, long long int iterations)
-{
+    // Update cost history
     if (cv->cost_count < MAX_COST_HISTORY)
     {
         cv->cost_history[cv->cost_count++] = cost;
@@ -114,61 +91,72 @@ void update_cost_graph(CostVisualizer *cv, float cost, long long int iterations)
         cv->cost_history[MAX_COST_HISTORY - 1] = cost;
     }
 
-    cv->min_cost = cost < cv->min_cost ? cost : cv->min_cost;
-    cv->max_cost = cost > cv->max_cost ? cost : cv->max_cost;
+    cv->min_cost = fminf(cost, cv->min_cost);
+    cv->max_cost = fmaxf(cost, cv->max_cost);
 
-    SDL_SetRenderDrawColor(cv->renderer, 255, 255, 255, 255);
-    SDL_RenderClear(cv->renderer);
+    // Draw graph background
+    DrawRectangle(graph_x, graph_y, COST_GRAPH_WIDTH, COST_GRAPH_HEIGHT, COLOR_BACKGROUND);
 
-    SDL_SetRenderDrawColor(cv->renderer, 0, 0, 0, 255);
-    SDL_RenderDrawLine(cv->renderer,
-                       COST_GRAPH_PADDING, COST_GRAPH_PADDING,
-                       COST_GRAPH_PADDING, COST_WINDOW_HEIGHT - COST_GRAPH_PADDING);
-    SDL_RenderDrawLine(cv->renderer,
-                       COST_GRAPH_PADDING, COST_WINDOW_HEIGHT - COST_GRAPH_PADDING,
-                       COST_WINDOW_WIDTH - COST_GRAPH_PADDING,
-                       COST_WINDOW_HEIGHT - COST_GRAPH_PADDING);
-
-    SDL_SetRenderDrawColor(cv->renderer, 255, 0, 0, 255);
-    for (int i = 1; i < cv->cost_count; i++)
+    // Draw grid
+    for (int i = 0; i < 10; i++)
     {
-        float x1 = COST_GRAPH_PADDING +
-                   ((i - 1) * (COST_WINDOW_WIDTH - 2 * COST_GRAPH_PADDING)) /
-                       (float)MAX_COST_HISTORY;
-        float x2 = COST_GRAPH_PADDING +
-                   (i * (COST_WINDOW_WIDTH - 2 * COST_GRAPH_PADDING)) /
-                       (float)MAX_COST_HISTORY;
-
-        float y1 = COST_WINDOW_HEIGHT - COST_GRAPH_PADDING -
-                   ((cv->cost_history[i - 1] - cv->min_cost) *
-                    (COST_WINDOW_HEIGHT - 2 * COST_GRAPH_PADDING)) /
-                       (cv->max_cost - cv->min_cost);
-        float y2 = COST_WINDOW_HEIGHT - COST_GRAPH_PADDING -
-                   ((cv->cost_history[i] - cv->min_cost) *
-                    (COST_WINDOW_HEIGHT - 2 * COST_GRAPH_PADDING)) /
-                       (cv->max_cost - cv->min_cost);
-
-        SDL_RenderDrawLineF(cv->renderer, x1, y1, x2, y2);
+        float y = graph_y + COST_GRAPH_PADDING +
+                  (i * (COST_GRAPH_HEIGHT - 2 * COST_GRAPH_PADDING) / 9.0f);
+        DrawLineEx(
+            (Vector2){graph_x + COST_GRAPH_PADDING, y},
+            (Vector2){graph_x + COST_GRAPH_WIDTH - COST_GRAPH_PADDING, y},
+            1, COLOR_GRID);
     }
 
-   /*  char stats_text[64];
-    snprintf(stats_text, sizeof(stats_text), "Iteration: %zu", iterations);
-    stringRGBA(cv->renderer, 10, 10, stats_text, 0, 0, 0, 255);
+    // Draw axes
+    DrawLineEx(
+        (Vector2){graph_x + COST_GRAPH_PADDING, graph_y + COST_GRAPH_PADDING},
+        (Vector2){graph_x + COST_GRAPH_PADDING, graph_y + COST_GRAPH_HEIGHT - COST_GRAPH_PADDING},
+        2, COLOR_TEXT);
+    DrawLineEx(
+        (Vector2){graph_x + COST_GRAPH_PADDING, graph_y + COST_GRAPH_HEIGHT - COST_GRAPH_PADDING},
+        (Vector2){graph_x + COST_GRAPH_WIDTH - COST_GRAPH_PADDING, graph_y + COST_GRAPH_HEIGHT - COST_GRAPH_PADDING},
+        2, COLOR_TEXT);
+
+    // Draw cost line
+    for (int i = 1; i < cv->cost_count; i++)
+    {
+        float x1 = graph_x + COST_GRAPH_PADDING +
+                   ((i - 1) * (COST_GRAPH_WIDTH - 2 * COST_GRAPH_PADDING)) /
+                       (float)MAX_COST_HISTORY;
+        float x2 = graph_x + COST_GRAPH_PADDING +
+                   (i * (COST_GRAPH_WIDTH - 2 * COST_GRAPH_PADDING)) /
+                       (float)MAX_COST_HISTORY;
+
+        float y1 = graph_y + COST_GRAPH_HEIGHT - COST_GRAPH_PADDING -
+                   ((cv->cost_history[i - 1] - cv->min_cost) *
+                    (COST_GRAPH_HEIGHT - 2 * COST_GRAPH_PADDING)) /
+                       (cv->max_cost - cv->min_cost);
+        float y2 = graph_y + COST_GRAPH_HEIGHT - COST_GRAPH_PADDING -
+                   ((cv->cost_history[i] - cv->min_cost) *
+                    (COST_GRAPH_HEIGHT - 2 * COST_GRAPH_PADDING)) /
+                       (cv->max_cost - cv->min_cost);
+
+        DrawLineEx((Vector2){x1, y1}, (Vector2){x2, y2}, 2, COLOR_COST_LINE);
+    }
+
+    // Draw stats
+    char stats_text[64];
+    snprintf(stats_text, sizeof(stats_text), "Iteration: %lld", iterations);
+    DrawText(stats_text, graph_x + 10, graph_y + 10, 20, COLOR_TEXT);
 
     snprintf(stats_text, sizeof(stats_text), "Cost: %.6f", cost);
-    stringRGBA(cv->renderer, 10, 30, stats_text, 0, 0, 0, 255); */
-
-    SDL_RenderPresent(cv->renderer);
+    DrawText(stats_text, graph_x + 10, graph_y + 40, 20, COLOR_TEXT);
 }
 
-void draw_network(Visualizer *vis, NN *nn)
+void draw_network(NN *nn)
 {
-    SDL_SetRenderDrawColor(vis->renderer, 255, 255, 255, 255);
-    SDL_RenderClear(vis->renderer);
-
+    // Network is now drawn in the left portion of the window
+    int network_width = WINDOW_WIDTH - COST_GRAPH_WIDTH - 40; // 40px total padding
     int total_width = (nn->arch_count - 1) * LAYER_SPACING;
-    int start_x = (WINDOW_WIDTH - total_width) / 2;
+    int start_x = (network_width - total_width) / 2;
 
+    // Draw connections
     for (size_t layer = 1; layer < nn->arch_count; layer++)
     {
         int x1 = start_x + (layer - 1) * LAYER_SPACING;
@@ -183,14 +171,14 @@ void draw_network(Visualizer *vis, NN *nn)
                 int y2 = WINDOW_HEIGHT / 2 + (j - nn->arch[layer] / 2.0) * VERTICAL_SPACING;
 
                 float weight = MAT_AT(nn->ws[layer], i, j);
-                Uint8 r, g, b;
-                weight_to_color(weight, &r, &g, &b);
+                Color connection_color = weight_to_color(weight);
 
-                lineRGBA(vis->renderer, x1, y1, x2, y2, r, g, b, 255);
+                DrawLineEx((Vector2){x1, y1}, (Vector2){x2, y2}, 2, connection_color);
             }
         }
     }
 
+    // Draw neurons
     for (size_t layer = 0; layer < nn->arch_count; layer++)
     {
         int x = start_x + layer * LAYER_SPACING;
@@ -199,24 +187,20 @@ void draw_network(Visualizer *vis, NN *nn)
         {
             int y = WINDOW_HEIGHT / 2 + (i - nn->arch[layer] / 2.0) * VERTICAL_SPACING;
 
-            filledCircleRGBA(vis->renderer, x, y, NEURON_RADIUS,
-                             100, 100, 100, 255);
-
-            circleRGBA(vis->renderer, x, y, NEURON_RADIUS,
-                       0, 0, 0, 255);
+            DrawCircleV((Vector2){x, y}, NEURON_RADIUS, COLOR_NEURON);
+            DrawCircleLines(x, y, NEURON_RADIUS, COLOR_NEURON_BORDER);
 
             if (nn->as[layer] != NULL)
             {
                 char activation_text[32];
                 snprintf(activation_text, sizeof(activation_text), "%.2f",
                          MAT_AT(nn->as[layer], 0, i));
-                stringRGBA(vis->renderer, x - 15, y - 6, activation_text,
-                           0, 0, 0, 255);
+
+                int text_width = MeasureText(activation_text, 20);
+                DrawText(activation_text, x - text_width / 2, y - 10, 20, COLOR_TEXT);
             }
         }
     }
-
-    SDL_RenderPresent(vis->renderer);
 }
 
 void cleanup_visualizer(Visualizer *vis)
@@ -225,16 +209,12 @@ void cleanup_visualizer(Visualizer *vis)
     {
         if (vis->cost_vis)
         {
-            SDL_DestroyRenderer(vis->cost_vis->renderer);
-            SDL_DestroyWindow(vis->cost_vis->window);
             free(vis->cost_vis->cost_history);
             free(vis->cost_vis);
         }
-        SDL_DestroyRenderer(vis->renderer);
-        SDL_DestroyWindow(vis->window);
         free(vis);
     }
-    SDL_Quit();
+    CloseWindow();
 }
 
 void learn_with_visualization(NN *nn, ELEMENT_TYPE eps, ELEMENT_TYPE learning_rate,
@@ -243,14 +223,10 @@ void learn_with_visualization(NN *nn, ELEMENT_TYPE eps, ELEMENT_TYPE learning_ra
 {
     for (size_t i = 0; i < learning_iterations && vis->running; i++)
     {
-        SDL_Event event;
-        while (SDL_PollEvent(&event))
+        if (WindowShouldClose())
         {
-            if (event.type == SDL_QUIT)
-            {
-                vis->running = 0;
-                return;
-            }
+            vis->running = false;
+            break;
         }
 
 #if MODEL == DIFF
@@ -266,10 +242,12 @@ void learn_with_visualization(NN *nn, ELEMENT_TYPE eps, ELEMENT_TYPE learning_ra
 #endif
 
         ELEMENT_TYPE current_cost = cost_NN(nn, training_input, training_output);
-        update_cost_graph(vis->cost_vis, current_cost, i);
 
-        draw_network(vis, nn);
-        // SDL_Delay(16); // Cap at ~60 FPS
+        BeginDrawing();
+        ClearBackground(COLOR_BACKGROUND);
+        draw_network(nn);
+        draw_cost_graph(vis->cost_vis, current_cost, i);
+        EndDrawing();
     }
 
     ELEMENT_TYPE cost = cost_NN(nn, training_input, training_output);
