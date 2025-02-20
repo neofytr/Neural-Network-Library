@@ -1,4 +1,4 @@
-#include "raylib/src/raylib.h"
+#include "./raylib/src/raylib.h"
 #define NN_IMPLEMENTATION_
 #include "./nn.h"
 #include <string.h>
